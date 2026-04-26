@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+.conda/
+node_modules/
+dist/
+backend/app.db
+backend/static/resumes/*
+backend/static/thumbnails/*
+backend/static/generated/*
+!backend/static/resumes/.gitkeep
+!backend/static/thumbnails/.gitkeep
+!backend/static/generated/.gitkeep
