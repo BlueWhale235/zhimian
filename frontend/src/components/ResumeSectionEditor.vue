@@ -7,12 +7,12 @@
       </v-btn>
     </div>
     <EmptyState
-      v-if="!modelValue.length"
+      v-if="!items.length"
       :icon="FileText"
       :title="`${title}为空`"
       description="添加一条经历后，它会随简历草稿自动保存。"
     />
-    <div v-for="(item, index) in modelValue" :key="index" class="section-item">
+    <div v-for="(item, index) in items" :key="index" class="section-item">
       <v-row>
         <v-col cols="12" md="6">
           <v-text-field :model-value="item.title" label="标题" variant="outlined" @update:model-value="update(index, 'title', $event)" />
@@ -26,7 +26,7 @@
         <v-btn icon variant="text" :disabled="index === 0" aria-label="上移" @click="move(index, -1)">
           <ArrowUp :size="18" />
         </v-btn>
-        <v-btn icon variant="text" :disabled="index === modelValue.length - 1" aria-label="下移" @click="move(index, 1)">
+        <v-btn icon variant="text" :disabled="index === items.length - 1" aria-label="下移" @click="move(index, 1)">
           <ArrowDown :size="18" />
         </v-btn>
         <v-spacer />
@@ -44,31 +44,30 @@ import EmptyState from './EmptyState.vue'
 
 const props = defineProps({
   title: { type: String, required: true },
-  modelValue: { type: Array, required: true }
+  items: { type: Array, required: true },
+  onChange: { type: Function, required: true }
 })
 
-const emit = defineEmits(['update:modelValue'])
-
 function add() {
-  emit('update:modelValue', [...props.modelValue, { title: '', meta: '', description: '' }])
+  props.onChange([...props.items, { title: '', meta: '', description: '' }])
 }
 
 function update(index, key, value) {
-  const next = props.modelValue.map((item, i) => i === index ? { ...item, [key]: value } : item)
-  emit('update:modelValue', next)
+  const next = props.items.map((item, i) => i === index ? { ...item, [key]: value } : item)
+  props.onChange(next)
 }
 
 function remove(index) {
-  const next = [...props.modelValue]
+  const next = [...props.items]
   next.splice(index, 1)
-  emit('update:modelValue', next)
+  props.onChange(next)
 }
 
 function move(index, offset) {
-  const next = [...props.modelValue]
+  const next = [...props.items]
   const target = index + offset
   const [item] = next.splice(index, 1)
   next.splice(target, 0, item)
-  emit('update:modelValue', next)
+  props.onChange(next)
 }
 </script>

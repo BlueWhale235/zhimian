@@ -18,6 +18,7 @@
     "vuetify": "^3.7.6"
   },
   "devDependencies": {
-    "playwright": "^1.59.1"
+    "playwright": "^1.59.1",
+    "vite-plugin-vue-devtools": "^8.1.1"
   }
 }

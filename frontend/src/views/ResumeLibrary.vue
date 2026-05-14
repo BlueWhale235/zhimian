@@ -31,8 +31,8 @@
         v-for="resume in resumes"
         :key="resume.id"
         :resume="resume"
-        @preview="preview = $event"
-        @delete="askDelete"
+        :on-preview="openPreview"
+        :on-delete="askDelete"
       />
     </div>
 
@@ -48,34 +48,58 @@
         <v-card-text class="pdf-frame-wrap">
           <iframe v-if="preview" class="pdf-frame" :src="assetUrl(preview.file_path_url)" />
         </v-card-text>
+        <v-expansion-panels v-if="preview" class="resume-text-panel" variant="accordion">
+          <v-expansion-panel>
+            <v-expansion-panel-title>
+              <div class="section-head resume-text-title">
+                <span>提取出来的简历文本</span>
+                <v-chip :color="preview.has_parsed_text ? 'success' : 'warning'" size="small" variant="tonal">
+                  {{ preview.has_parsed_text ? '已有有效文本' : '文本不足' }}
+                </v-chip>
+              </div>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <div class="form-actions mb-3">
+                <v-btn color="primary" variant="outlined" :loading="loading" @click="extractPreviewText">
+                  <Sparkles :size="18" class="mr-2" />AI 提取/重提取
+                </v-btn>
+                <span class="muted">扫描件或本地抽取效果不好时再使用，会消耗模型额度。</span>
+              </div>
+              <pre class="resume-text-preview">{{ preview.parsed_text || '暂无提取文本。可以点击 AI 提取，或检查 PDF 是否为扫描件。' }}</pre>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
       </v-card>
     </v-dialog>
 
     <ConfirmDialog
-      v-model="confirmOpen"
+      :model-value="confirmOpen"
       title="删除简历"
       :message="`确定删除「${pendingDelete?.original_name || ''}」吗？文件和缩略图也会被清理。`"
       confirm-text="删除"
-      @confirm="confirmDelete"
+      :on-change="value => { confirmOpen = value }"
+      :on-confirm="confirmDelete"
     />
   </section>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
-import { FileText, UploadCloud, X } from 'lucide-vue-next'
+import { computed, ref, watch } from 'vue'
+import { FileText, Sparkles, UploadCloud, X } from 'lucide-vue-next'
 import { assetUrl } from '../api'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
 import ResumeCard from '../components/ResumeCard.vue'
 
-defineProps({
+const props = defineProps({
   resumes: { type: Array, required: true },
-  loading: { type: Boolean, default: false }
+  loading: { type: Boolean, default: false },
+  onUpload: { type: Function, required: true },
+  onDelete: { type: Function, required: true },
+  onExtractText: { type: Function, required: true },
+  onToast: { type: Function, required: true }
 })
-
-const emit = defineEmits(['upload', 'delete', 'toast'])
 
 const fileInput = ref(null)
 const dragging = ref(false)
@@ -97,11 +121,10 @@ function submit(candidate) {
   const selected = normalizeFile(candidate)
   if (!selected) return
   if (selected.type !== 'application/pdf' && !selected.name?.toLowerCase().endsWith('.pdf')) {
-    emit('toast', '仅支持上传 PDF 文件。', 'warning')
+    props.onToast('仅支持上传 PDF 文件。', 'warning')
     return
   }
-  emit('upload', selected)
-  file.value = null
+  props.onUpload(selected)
 }
 
 function onNativePick(event) {
@@ -120,7 +143,22 @@ function askDelete(resume) {
 }
 
 function confirmDelete() {
-  if (pendingDelete.value) emit('delete', pendingDelete.value.id)
+  if (pendingDelete.value) props.onDelete(pendingDelete.value.id)
   confirmOpen.value = false
 }
+
+function extractPreviewText() {
+  if (!preview.value) return
+  props.onExtractText(preview.value.id)
+}
+
+function openPreview(resume) {
+  preview.value = resume
+}
+
+watch(() => props.resumes, (items) => {
+  if (!preview.value) return
+  const updated = items.find(item => item.id === preview.value.id)
+  if (updated) preview.value = updated
+}, { deep: true })
 </script>

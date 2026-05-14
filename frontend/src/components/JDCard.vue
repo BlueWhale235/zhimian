@@ -15,12 +15,12 @@
       <p class="muted mt-3">{{ jd.content.slice(0, 140) }}{{ jd.content.length > 140 ? '...' : '' }}</p>
     </v-card-text>
     <v-card-actions>
-      <v-btn variant="text" color="primary" @click="$emit('select', jd)">查看详情</v-btn>
-      <v-btn icon variant="text" color="primary" aria-label="重新提取" @click="$emit('extract', jd)">
-        <Sparkles :size="18" />
+      <v-btn variant="text" color="primary" @click="onSelect(jd)">查看详情</v-btn>
+      <v-btn v-if="!skills.length" color="#FF9800" aria-label="重新提取" @click="onExtract(jd)">
+        AI重新提取
       </v-btn>
       <v-spacer />
-      <v-btn icon variant="text" color="error" aria-label="删除" @click="$emit('delete', jd)">
+      <v-btn icon variant="text" color="error" aria-label="删除" @click="onDelete(jd)">
         <Trash2 :size="18" />
       </v-btn>
     </v-card-actions>
@@ -33,10 +33,11 @@ import { Sparkles, Trash2 } from 'lucide-vue-next'
 
 const props = defineProps({
   jd: { type: Object, required: true },
-  selected: { type: Boolean, default: false }
+  selected: { type: Boolean, default: false },
+  onSelect: { type: Function, required: true },
+  onExtract: { type: Function, required: true },
+  onDelete: { type: Function, required: true }
 })
-
-defineEmits(['select', 'extract', 'delete'])
 
 const skills = computed(() => props.jd.requirements?.skills || [])
 </script>

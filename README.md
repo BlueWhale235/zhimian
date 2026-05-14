@@ -4,10 +4,7 @@
 
 ## 后端环境
 
-推荐使用独立 conda 环境，避免污染 `base` 或你已有的工作环境：
-
 ```powershell
-cd d:\resumehelper
 conda env create -f environment.yml
 conda activate zhimian
 ```
@@ -15,7 +12,6 @@ conda activate zhimian
 如果环境已经创建过，更新依赖：
 
 ```powershell
-cd d:\resumehelper
 conda env update -f environment.yml --prune
 conda activate zhimian
 ```
@@ -77,9 +73,3 @@ npm run dev
 - 文字模拟面试，支持普通/压力模式。
 - 面试历史与 STAR 复盘报告。
 - 本地 SQLite 与 `backend/static/` 静态文件存储。
-
-## 关于 pip dependency resolver 警告
-
-如果你在 conda `base` 或已有环境里直接运行 `pip install -r backend/requirements.txt`，pip 可能会报告其他无关包缺依赖，例如 `chromadb`、`flask`、`torchvision`。这通常说明当前 conda 环境里已有包处于不完整状态，不代表职面项目依赖冲突。
-
-建议使用上面的 `zhimian` 独立 conda 环境运行本项目。

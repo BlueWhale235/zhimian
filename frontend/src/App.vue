@@ -28,7 +28,7 @@
         <Menu :size="20" />
       </v-btn>
       <v-app-bar-title>{{ currentTitle }}</v-app-bar-title>
-      <!-- <v-chip color="secondary" variant="tonal" size="small">本地单机版</v-chip> -->
+      <v-chip color="secondary" variant="tonal" size="small">本地单机版</v-chip>
     </v-app-bar>
 
     <v-main>
@@ -46,11 +46,10 @@
 </template>
 
 <script setup>
-import { computed, markRaw, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, markRaw, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   BriefcaseBusiness,
-  History,
   Menu,
   MessagesSquare,
   PenLine,
@@ -64,8 +63,7 @@ const nav = [
   { key: 'resumes', label: '简历库', icon: markRaw(Upload), to: '/resumes' },
   { key: 'builder', label: '在线构建', icon: markRaw(PenLine), to: '/builder' },
   { key: 'jds', label: 'JD 管理', icon: markRaw(BriefcaseBusiness), to: '/jds' },
-  { key: 'interview', label: '模拟面试', icon: markRaw(MessagesSquare), to: '/interview' },
-  { key: 'history', label: '历史报告', icon: markRaw(History), to: '/history' },
+  { key: 'interview', label: '面试与报告', icon: markRaw(MessagesSquare), to: '/interview' },
   { key: 'settings', label: '系统设置', icon: markRaw(Settings), to: '/settings' }
 ]
 
@@ -85,9 +83,22 @@ const resumes = ref([])
 const jds = ref([])
 const interviews = ref([])
 const activeInterview = ref(null)
-const selectedHistory = ref(null)
+const streamingAssistant = ref('')
 const profile = ref(defaultProfile())
-const settings = reactive({ base_url: '', api_key: '', model: '', max_rounds: 6, pressure_level: 3, interviewer_prompt: '' })
+const settings = reactive({
+  base_url: '',
+  api_key: '',
+  model: '',
+  jd_model: '',
+  url_extract_model: '',
+  resume_extract_model: '',
+  interview_model: '',
+  report_model: '',
+  max_rounds: 6,
+  pressure_level: 3,
+  normal_interviewer_prompt: '',
+  pressure_interviewer_prompt: ''
+})
 
 const isMobile = computed(() => width.value < 900)
 const activeNavKey = computed(() => route.meta.navKey || 'resumes')
@@ -101,38 +112,39 @@ const routeProps = computed(() => {
     resumes: {
       resumes: resumes.value,
       onUpload: uploadResume,
+      onExtractText: extractResumeText,
       onDelete: removeResume
     },
     builder: {
       profile: profile.value,
       saveStatus: saveStatus.value,
-      'onUpdate:profile': updateProfile,
+      onChange: updateProfile,
       onExport: exportProfile
     },
     jds: {
       jds: jds.value,
+      extractUrl: extractJdFromUrl,
       onCreate: createJd,
+      onUpdate: updateJd,
       onExtract: extractJd,
       onDelete: deleteJd
     },
-    interview: {
+    interviewCenter: {
       resumes: resumes.value,
       jds: jds.value,
-      activeInterview: activeInterview.value,
+      interviews: interviews.value,
       settings,
       onStart: startInterview,
+      onDelete: deleteInterview,
+      onSavePrompt: saveInterviewPrompt,
+      onRefresh: loadAll
+    },
+    interviewDetail: {
+      activeInterview: activeInterview.value,
+      streamingAssistant: streamingAssistant.value,
       onAnswer: sendAnswer,
       onFinish: finishActiveInterview,
-      onDelete: deleteActiveInterview,
-      onSavePrompt: saveInterviewPrompt
-    },
-    history: {
-      interviews: interviews.value,
-      selected: selectedHistory.value,
-      onRefresh: loadAll,
-      onSelect: loadInterview,
-      onFinish: finishHistoryInterview,
-      onDelete: deleteInterview
+      onDelete: deleteActiveInterview
     },
     settings: {
       settings,
@@ -223,6 +235,13 @@ async function removeResume(id) {
   }, '简历已删除')
 }
 
+async function extractResumeText(id) {
+  await run(async () => {
+    const updated = await api.extractResumeText(id)
+    resumes.value = resumes.value.map(item => item.id === updated.id ? updated : item)
+  }, '简历文本已提取')
+}
+
 function updateProfile(nextProfile) {
   profile.value = nextProfile
   saveStatus.value = 'dirty'
@@ -256,6 +275,17 @@ async function createJd(payload) {
   }, 'JD 已保存')
 }
 
+async function extractJdFromUrl(url) {
+  return run(() => api.extractJdFromUrl(url))
+}
+
+async function updateJd(payload) {
+  await run(async () => {
+    await api.updateJd(payload.id, payload)
+    jds.value = await api.listJds()
+  }, 'JD 已更新')
+}
+
 async function extractJd(id) {
   await run(async () => {
     await api.extractJd(id)
@@ -275,38 +305,46 @@ async function startInterview(payload) {
   await run(async () => {
     activeInterview.value = await api.createInterview(payload)
     interviews.value = await api.listInterviews()
+    router.push(`/interview/${activeInterview.value.session.id}`)
   }, '面试已开始')
 }
 
 async function sendAnswer(content) {
+  if (!activeInterview.value) return
   await run(async () => {
-    activeInterview.value = await api.answerInterview(activeInterview.value.session.id, content)
+    const current = activeInterview.value
+    activeInterview.value = {
+      ...current,
+      messages: [
+        ...current.messages,
+        { id: `user-${Date.now()}`, role: 'user', content, created_at: '刚刚' }
+      ]
+    }
+    streamingAssistant.value = ''
+    activeInterview.value = await api.answerInterviewStream(current.session.id, content, delta => {
+      streamingAssistant.value += delta
+    })
+    streamingAssistant.value = ''
     interviews.value = await api.listInterviews()
   })
 }
 
 async function finishActiveInterview() {
   if (!activeInterview.value) return
-  await finishInterviewById(activeInterview.value.session.id, true)
+  await finishInterviewById(activeInterview.value.session.id)
 }
 
 async function deleteActiveInterview() {
   if (!activeInterview.value) return
   await deleteInterview(activeInterview.value.session.id)
-  activeInterview.value = null
 }
 
-async function finishHistoryInterview(id) {
-  await finishInterviewById(id, false)
-}
-
-async function finishInterviewById(id, switchToHistory) {
+async function finishInterviewById(id) {
   await run(async () => {
     const result = await api.finishInterview(id)
-    if (activeInterview.value?.session.id === id) activeInterview.value = result
-    selectedHistory.value = result
+    activeInterview.value = result
     interviews.value = await api.listInterviews()
-    if (switchToHistory) router.push('/history')
+    router.push(`/interview/${id}`)
   }, 'STAR 报告已生成')
 }
 
@@ -314,13 +352,14 @@ async function deleteInterview(id) {
   await run(async () => {
     await api.deleteInterview(id)
     interviews.value = await api.listInterviews()
-    if (selectedHistory.value?.session?.id === id) selectedHistory.value = null
     if (activeInterview.value?.session?.id === id) activeInterview.value = null
+    if (route.name === 'interview-detail' && String(route.params.id) === String(id)) router.push('/interview')
   }, '面试记录已删除')
 }
 
-async function loadInterview(id) {
-  selectedHistory.value = await run(() => api.getInterview(id))
+async function loadActiveInterview(id) {
+  const result = await run(() => api.getInterview(id))
+  if (result) activeInterview.value = result
 }
 
 async function saveSettings(nextSettings) {
@@ -330,8 +369,9 @@ async function saveSettings(nextSettings) {
   }, '设置已保存')
 }
 
-async function saveInterviewPrompt(prompt) {
-  await saveSettings({ ...settings, interviewer_prompt: prompt })
+async function saveInterviewPrompt({ mode, prompt }) {
+  const key = mode === 'pressure' ? 'pressure_interviewer_prompt' : 'normal_interviewer_prompt'
+  await saveSettings({ ...settings, [key]: prompt })
 }
 
 function onResize() {
@@ -346,12 +386,21 @@ onMounted(async () => {
       new Promise(resolve => window.setTimeout(resolve, 9000))
     ])
     if (!healthOk.value) {
-      toast('页面已载入，但暂时无法连接后端。请确认 FastAPI 在 8000 端口运行。', 'warning')
+      toast('页面已加载，但暂时无法连接后端。请确认 FastAPI 在 8000 端口运行。', 'warning')
     }
   } finally {
     booting.value = false
   }
 })
+
+watch(() => [route.name, route.params.id], ([name, id]) => {
+  if (name === 'interview-detail' && id) {
+    loadActiveInterview(id)
+  } else if (name === 'interview') {
+    activeInterview.value = null
+    streamingAssistant.value = ''
+  }
+}, { immediate: true })
 
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)

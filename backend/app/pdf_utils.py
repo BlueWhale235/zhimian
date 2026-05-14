@@ -1,4 +1,5 @@
 import html
+import base64
 import uuid
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,37 @@ def make_thumbnail(pdf_path: Path) -> str | None:
         return rel(target)
     except Exception:
         return None
+
+
+def extract_pdf_text(pdf_path: Path, max_chars: int = 30000) -> str:
+    try:
+        doc = fitz.open(pdf_path)
+        parts: list[str] = []
+        for index, page in enumerate(doc):
+            text = page.get_text("text").strip()
+            if text:
+                parts.append(f"--- 第 {index + 1} 页 ---\n{text}")
+            if sum(len(part) for part in parts) >= max_chars:
+                break
+        doc.close()
+        return "\n\n".join(parts)[:max_chars].strip()
+    except Exception:
+        return ""
+
+
+def pdf_page_images_as_data_urls(pdf_path: Path, max_pages: int = 3) -> list[str]:
+    images: list[str] = []
+    try:
+        doc = fitz.open(pdf_path)
+        for page in list(doc)[:max_pages]:
+            pix = page.get_pixmap(matrix=fitz.Matrix(1.4, 1.4), alpha=False)
+            data = pix.tobytes("png")
+            encoded = base64.b64encode(data).decode("ascii")
+            images.append(f"data:image/png;base64,{encoded}")
+        doc.close()
+    except Exception:
+        return []
+    return images
 
 
 def profile_to_html(data: dict[str, Any]) -> str:

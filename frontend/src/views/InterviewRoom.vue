@@ -8,15 +8,23 @@
         <v-select v-model="form.mode" :disabled="inProgress" :items="modeItems" label="模式" variant="outlined" />
         <v-slider v-model="form.max_rounds" :disabled="inProgress" label="最大轮数" min="1" max="20" step="1" thumb-label />
         <v-slider v-model="form.pressure_level" :disabled="inProgress || form.mode !== 'pressure'" label="压力强度" min="1" max="5" step="1" thumb-label />
+        <v-expansion-panels class="mb-4" variant="accordion">
+          <v-expansion-panel title="公司背景简介">
+            <v-expansion-panel-text>
+              <p class="muted mb-3">背景信息从 JD 管理中保存，会自动作为面试上下文的一部分。</p>
+              <p class="jd-content">{{ selectedJd?.company_background || activeInterview?.session?.company_background || '未提供公司背景。' }}</p>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
         <v-textarea
           v-model="form.interviewer_prompt"
           :disabled="inProgress"
-          label="面试官 Prompt"
+          :label="form.mode === 'pressure' ? '压力面试 Prompt' : '普通面试 Prompt'"
           variant="outlined"
           rows="6"
           auto-grow
         />
-        <v-btn class="mb-3" variant="outlined" block :disabled="inProgress || loading" @click="$emit('save-prompt', form.interviewer_prompt)">
+        <v-btn class="mb-3" variant="outlined" block :disabled="inProgress || loading" @click="onSavePrompt({ mode: form.mode, prompt: form.interviewer_prompt })">
           <Save :size="18" class="mr-2" />保存为默认 Prompt
         </v-btn>
 
@@ -27,10 +35,10 @@
           <div><strong>轮数：</strong>{{ userRounds }}/{{ form.max_rounds }}</div>
         </div>
 
-        <v-btn v-if="!activeInterview" block color="primary" :loading="loading" @click="$emit('start', { ...form })">
+        <v-btn v-if="!activeInterview" block color="primary" :loading="loading" @click="onStart({ ...form })">
           <MessagesSquare :size="18" class="mr-2" />开始面试
         </v-btn>
-        <v-btn v-else block class="mt-2" variant="outlined" :disabled="activeInterview.session.status === 'finished'" :loading="loading" @click="$emit('finish')">
+        <v-btn v-else block class="mt-2" variant="outlined" :disabled="activeInterview.session.status === 'finished'" :loading="loading" @click="onFinish">
           <CheckCircle2 :size="18" class="mr-2" />{{ finishLabel }}
         </v-btn>
         <v-btn v-if="activeInterview" block class="mt-2" color="error" variant="text" :loading="loading" @click="confirmOpen = true">
@@ -43,9 +51,10 @@
         <template v-else>
           <div ref="chatEl" class="chat">
             <ChatMessage v-for="message in activeInterview.messages" :key="message.id" :message="message" />
+            <ChatMessage v-if="streamingAssistant" :message="{ role: 'assistant', content: streamingAssistant, created_at: '生成中' }" />
           </div>
           <v-alert v-if="activeInterview.session.status === 'ready_to_finish'" class="mt-4" type="info" variant="tonal">
-            已达到最大轮数，可以结束并生成 STAR 报告。
+            已达到最大轮数，面试结束，可以结束并生成报告。
           </v-alert>
           <v-alert v-if="activeInterview.session.status === 'finished'" class="mt-4" type="success" variant="tonal">
             面试已结束，可在历史报告中查看复盘。
@@ -54,7 +63,7 @@
             v-if="activeInterview.session.status === 'active'"
             v-model="answer"
             class="mt-4"
-            label="输入你的回答"
+            label="输入回答"
             variant="outlined"
             rows="4"
             :disabled="loading"
@@ -74,11 +83,12 @@
     </div>
 
     <ConfirmDialog
-      v-model="confirmOpen"
+      :model-value="confirmOpen"
       title="删除面试"
       message="确定删除当前面试吗？对话记录和复盘报告都会被删除。"
       confirm-text="删除"
-      @confirm="deleteCurrent"
+      :on-change="value => { confirmOpen = value }"
+      :on-confirm="deleteCurrent"
     />
   </section>
 </template>
@@ -95,11 +105,15 @@ const props = defineProps({
   resumes: { type: Array, required: true },
   jds: { type: Array, required: true },
   activeInterview: { type: Object, default: null },
+  streamingAssistant: { type: String, default: '' },
   settings: { type: Object, required: true },
-  loading: { type: Boolean, default: false }
+  loading: { type: Boolean, default: false },
+  onStart: { type: Function, required: true },
+  onAnswer: { type: Function, required: true },
+  onFinish: { type: Function, required: true },
+  onDelete: { type: Function, required: true },
+  onSavePrompt: { type: Function, required: true }
 })
-
-const emit = defineEmits(['start', 'answer', 'finish', 'delete', 'save-prompt'])
 
 const answer = ref('')
 const chatEl = ref(null)
@@ -122,15 +136,27 @@ watch(() => props.settings, (value) => {
   form.max_rounds = Number(value.max_rounds || 6)
   form.pressure_level = Number(value.pressure_level || 3)
   if (!props.activeInterview) {
-    form.interviewer_prompt = value.interviewer_prompt || ''
+    form.interviewer_prompt = form.mode === 'pressure' ? (value.pressure_interviewer_prompt || '') : (value.normal_interviewer_prompt || '')
   }
 }, { immediate: true, deep: true })
+
+watch(() => form.mode, (mode) => {
+  if (!props.activeInterview) {
+    form.interviewer_prompt = mode === 'pressure' ? (props.settings.pressure_interviewer_prompt || '') : (props.settings.normal_interviewer_prompt || '')
+  }
+})
 
 watch(() => props.activeInterview?.session?.interviewer_prompt, (value) => {
   if (value) form.interviewer_prompt = value
 })
 
 watch(() => props.activeInterview?.messages?.length, () => {
+  nextTick(() => {
+    if (chatEl.value) chatEl.value.scrollTop = chatEl.value.scrollHeight
+  })
+})
+
+watch(() => props.streamingAssistant, () => {
   nextTick(() => {
     if (chatEl.value) chatEl.value.scrollTop = chatEl.value.scrollHeight
   })
@@ -145,12 +171,12 @@ const finishLabel = computed(() => props.activeInterview?.session.status === 're
 function submit() {
   const text = answer.value.trim()
   if (!text) return
-  emit('answer', text)
+  props.onAnswer(text)
   answer.value = ''
 }
 
 function deleteCurrent() {
   confirmOpen.value = false
-  emit('delete')
+  props.onDelete()
 }
 </script>

@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HistoryReports from './views/HistoryReports.vue'
-import InterviewRoom from './views/InterviewRoom.vue'
+import InterviewCenter from './views/InterviewCenter.vue'
+import InterviewDetail from './views/InterviewDetail.vue'
 import JDManager from './views/JDManager.vue'
 import ResumeBuilder from './views/ResumeBuilder.vue'
 import ResumeLibrary from './views/ResumeLibrary.vue'
@@ -32,14 +32,18 @@ export const routes = [
   {
     path: '/interview',
     name: 'interview',
-    component: InterviewRoom,
-    meta: { title: '模拟面试', navKey: 'interview', propsKey: 'interview' }
+    component: InterviewCenter,
+    meta: { title: '面试与报告', navKey: 'interview', propsKey: 'interviewCenter' }
+  },
+  {
+    path: '/interview/:id',
+    name: 'interview-detail',
+    component: InterviewDetail,
+    meta: { title: '面试详情', navKey: 'interview', propsKey: 'interviewDetail' }
   },
   {
     path: '/history',
-    name: 'history',
-    component: HistoryReports,
-    meta: { title: '历史报告', navKey: 'history', propsKey: 'history' }
+    redirect: '/interview'
   },
   {
     path: '/settings',

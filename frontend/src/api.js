@@ -49,6 +49,7 @@ export const api = {
     return request('/api/resumes', { method: 'POST', body: form })
   },
   deleteResume: (id) => request(`/api/resumes/${id}`, { method: 'DELETE' }),
+  extractResumeText: (id) => request(`/api/resumes/${id}/extract-text`, { method: 'POST', timeout: AI_REQUEST_TIMEOUT }),
   getProfile: () => request('/api/profile'),
   saveProfile: (data) => request('/api/profile', {
     method: 'PUT',
@@ -62,6 +63,17 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
     timeout: AI_REQUEST_TIMEOUT
+  }),
+  extractJdFromUrl: (url) => request('/api/jds/extract-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+    timeout: AI_REQUEST_TIMEOUT
+  }),
+  updateJd: (id, data) => request(`/api/jds/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
   }),
   extractJd: (id) => request(`/api/jds/${id}/extract`, { method: 'POST', timeout: AI_REQUEST_TIMEOUT }),
   deleteJd: (id) => request(`/api/jds/${id}`, { method: 'DELETE' }),
@@ -80,5 +92,43 @@ export const api = {
     body: JSON.stringify({ content }),
     timeout: AI_REQUEST_TIMEOUT
   }),
+  answerInterviewStream: async (id, content, onDelta) => {
+    const response = await fetch(`${API_BASE}/api/interviews/${id}/answer/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    })
+    if (!response.ok || !response.body) {
+      return request(`/api/interviews/${id}/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+        timeout: AI_REQUEST_TIMEOUT
+      })
+    }
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let finalInterview = null
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        if (!line.trim()) continue
+        const event = JSON.parse(line)
+        if (event.type === 'delta') onDelta?.(event.content)
+        if (event.type === 'done') finalInterview = event.interview
+      }
+    }
+    if (buffer.trim()) {
+      const event = JSON.parse(buffer)
+      if (event.type === 'delta') onDelta?.(event.content)
+      if (event.type === 'done') finalInterview = event.interview
+    }
+    return finalInterview || api.getInterview(id)
+  },
   finishInterview: (id) => request(`/api/interviews/${id}/finish`, { method: 'POST', timeout: AI_REQUEST_TIMEOUT })
 }

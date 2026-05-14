@@ -165,7 +165,7 @@ h4 {
 }
 
 .pdf-frame-wrap {
-  height: 72vh;
+  height: 58vh;
   padding: 0;
 }
 
@@ -173,6 +173,28 @@ h4 {
   width: 100%;
   height: 100%;
   border: 0;
+}
+
+.resume-text-panel {
+  border-top: 1px solid #e6eaf0;
+}
+
+.resume-text-title {
+  width: 100%;
+}
+
+.resume-text-preview {
+  max-height: 260px;
+  padding: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f8fafc;
+  border: 1px solid #e6eaf0;
+  border-radius: 8px;
+  font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.7;
 }
 
 .selected {
@@ -186,6 +208,13 @@ h4 {
 
 .detail-block {
   margin: 8px 0 14px;
+}
+
+.url-extract-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
 }
 
 .section-head,
@@ -231,6 +260,10 @@ h4 {
 
 .history-chat {
   max-height: 360px;
+}
+
+.large-history-chat {
+  max-height: 52vh;
 }
 
 .message-row {
@@ -282,6 +315,81 @@ h4 {
   overflow: auto;
 }
 
+.interview-center-layout {
+  grid-template-columns: minmax(300px, 0.9fr) minmax(360px, 1.45fr);
+}
+
+.interview-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(420px, 1.6fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.session-list {
+  display: grid;
+  gap: 10px;
+}
+
+.session-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  color: inherit;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #e6eaf0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.session-row:hover {
+  border-color: #b9c7da;
+  background: #f8fafc;
+}
+
+.session-main {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.session-title,
+.session-actions,
+.session-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.session-title {
+  justify-content: space-between;
+  font-weight: 700;
+}
+
+.session-title span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-meta {
+  flex-wrap: wrap;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.session-actions {
+  justify-content: flex-end;
+}
+
+.detail-chat {
+  max-height: 56vh;
+}
+
 .report-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -295,6 +403,7 @@ h4 {
 @media (max-width: 900px) {
   .two-col,
   .history-layout,
+  .interview-detail-grid,
   .report-grid {
     grid-template-columns: 1fr;
   }
@@ -323,5 +432,18 @@ h4 {
     flex-direction: column;
     padding: 16px;
     text-align: center;
+  }
+
+  .url-extract-row {
+    grid-template-columns: 1fr;
+  }
+
+  .session-row {
+    grid-template-columns: 1fr;
+  }
+
+  .session-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }

@@ -20,9 +20,9 @@
         </v-row>
         <v-textarea v-model="local.summary" label="个人总结" variant="outlined" rows="4" />
       </div>
-      <ResumeSectionEditor v-model="local.education" title="教育背景" />
-      <ResumeSectionEditor v-model="local.internships" title="实习经历" />
-      <ResumeSectionEditor v-model="local.projects" title="项目经历" />
+      <ResumeSectionEditor title="教育背景" :items="local.education" :on-change="value => setSection('education', value)" />
+      <ResumeSectionEditor title="实习经历" :items="local.internships" :on-change="value => setSection('internships', value)" />
+      <ResumeSectionEditor title="项目经历" :items="local.projects" :on-change="value => setSection('projects', value)" />
     </div>
   </section>
 </template>
@@ -36,10 +36,11 @@ import ResumeSectionEditor from '../components/ResumeSectionEditor.vue'
 const props = defineProps({
   profile: { type: Object, required: true },
   loading: { type: Boolean, default: false },
-  saveStatus: { type: String, default: 'saved' }
+  saveStatus: { type: String, default: 'saved' },
+  onChange: { type: Function, required: true },
+  onExport: { type: Function, required: true },
+  onToast: { type: Function, required: true }
 })
-
-const emit = defineEmits(['update:profile', 'export', 'toast'])
 
 const local = reactive(defaultProfile())
 let syncingFromParent = false
@@ -55,7 +56,7 @@ watch(() => props.profile, (value) => {
 
 watch(local, () => {
   if (syncingFromParent) return
-  emit('update:profile', JSON.parse(JSON.stringify(local)))
+  props.onChange(JSON.parse(JSON.stringify(local)))
 }, { deep: true })
 
 const saveLabel = computed(() => ({
@@ -82,10 +83,14 @@ function defaultProfile() {
   }
 }
 
+function setSection(key, value) {
+  local[key] = value
+}
+
 function exportNow() {
   if (!local.personal.name && !local.summary) {
-    emit('toast', '建议先填写姓名或个人总结，仍可继续导出。', 'warning')
+    props.onToast('建议先填写姓名或个人总结，仍可继续导出。', 'warning')
   }
-  emit('export')
+  props.onExport()
 }
 </script>
