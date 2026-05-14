@@ -19,7 +19,7 @@ conda activate zhimian
 ## 启动后端
 
 ```powershell
-cd d:\resumehelper\backend
+cd .\backend
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
@@ -40,14 +40,14 @@ python -m uvicorn app.main:app --reload --port 8010
 换端口后，前端需要设置同样的 API 地址，例如：
 
 ```powershell
-$env:VITE_API_BASE="http://127.0.0.1:8010"
+cd .\frontend
 npm run dev
 ```
 
 ## 启动前端
 
 ```powershell
-cd d:\resumehelper\frontend
+cd .\frontend
 npm install
 npm run dev
 ```
